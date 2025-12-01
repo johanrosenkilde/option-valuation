@@ -41,30 +41,42 @@ Key Features for Employee Stock Options:
 This script expects input parameters to be provided in a YAML file, specified
 as a command-line argument.
 
-Example YAML format:
+## Model Inputs
+
+The following parameters are required for the option valuation:
+
+**Basic Option Parameters:**
+- `s0`: Current stock price (float). This should be the fair market value from the 409A valuation, or adjusted based on your specific context (e.g., applying different discounts for lack of marketability depending on tax jurisdiction).
+- `K`: Strike price of the option (float).
+- `exit_rate`: Annual probability that the employee exits the company, resulting in forfeiture of unvested options (float, e.g., 0.15 for 15%).
+- `exercise_factor`: Multiple of the strike price at which employees are assumed to exercise their options early (float, e.g., 3 means exercise when stock price reaches 3x strike).
+
+**Scenarios:**
+Each scenario represents a different potential outcome (e.g., company IPO, acquisition, or continued private status) and requires:
+- `T`: Time to expiration in years (float).
+- `Vs`: List of vesting periods in years for different option grants (list of floats).
+- `r`: Risk-free interest rate (float).
+- `sigma`: Annual volatility of the stock (float).
+- `prob`: Probability of this scenario occurring (float). All scenario probabilities must sum to 1.0.
+
+You can define any number of scenarios with arbitrary names. The model will compute a probability-weighted average across all scenarios.
 
 ```yaml
-s0: 1.95                # Current stock price (float)
-K: 1.10                 # Strike price (float)
-exit_rate: 0.15         # Annual probability the employee exits the company,
-                          forfeiting further vests (float, e.g. 0.15 for 15%)
-exercise_factor: 3      # Factor over strike price at which the employee exercises the option. (float)
+s0: 1.95
+K: 1.10
+exit_rate: 0.15
+exercise_factor: 3
 scenarios:
   late_exit:
-    T: 10                   # Time to expiration in years (float)
-    Vs: [1,2,3,4]           # List of vesting periods in years (list of floats)
-    r: 0.039                # Risk-free interest rate (float)
-    sigma: 0.72             # Volatility (float)
-    prob: 0.25              # Probability of scenario (float)
+    T: 10
+    Vs: [1, 2, 3, 4]
+    r: 0.039
+    sigma: 0.72
+    prob: 0.25
   early_exit:
-    T: 1.55                 # This scenario the company exits early, so remaining 
-                            # options vest immediately.
+    T: 1.55
     Vs: [1, 1.5, 1.5, 1.5]
     r: 0.045
     sigma: 0.16
     prob: 0.75
 ```
-
-All fields are required. Any number of scenarios can be provided under
-`scenarios`, with arbitrary names. The sum of all scenario 'prob' fields must
-be 1.0.
