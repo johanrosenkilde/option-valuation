@@ -301,13 +301,15 @@ exit_rate = None
 exercise_factor = None
 scenarios = None
 
-def rel_strike(x):
-    rat = x / K * 100
-    return f"{rat:.2f}%"
-
-def rel_stock(x):
-    rat = x / S0 * 100
-    return f"{rat:.2f}%"
+def format_value(value, strike_price, stock_price):
+    """Format option value with absolute amount and meaningful percentages."""
+    if value <= 0:
+        return f"${value:.3f} (no intrinsic value)"
+    
+    pct_of_strike = (value / strike_price) * 100
+    pct_of_stock = (value / stock_price) * 100
+    
+    return f"${value:.3f} ({pct_of_strike:.1f}% of strike, {pct_of_stock:.1f}% of stock price)"
 
 
 def scenario_value(d, pure_or_hw):
@@ -320,18 +322,73 @@ def scenario_value(d, pure_or_hw):
     return avg
 
 
+def print_input_summary():
+    """Print a summary of the input parameters for transparency."""
+    print("=" * 60)
+    print("INPUT PARAMETERS")
+    print("=" * 60)
+    print(f"Current stock price (S0): ${S0:.2f}")
+    print(f"Strike price (K): ${K:.2f}")
+    print(f"Annual exit rate: {exit_rate:.1%}")
+    print(f"Early exercise factor: {exercise_factor}x strike price")
+    print(f"\nSCENARIOS:")
+    for scenario_name, d in scenarios.items():
+        print(f"  {scenario_name.replace('_', ' ').title()}:")
+        print(f"    - Time to expiry: {d['T']:.1f} years")
+        print(f"    - Vesting schedule: {', '.join(f'{v:.1f}yr' for v in d['Vs'])}")
+        print(f"    - Risk-free rate: {d['r']:.1%}")
+        print(f"    - Volatility: {d['sigma']:.1%}")
+        print(f"    - Probability: {d['prob']:.1%}")
+    print()
+
 def exit_value():
-    def print_and_weighted_avg(name, pure_or_hw):
+    print_input_summary()
+    
+    print("=" * 60)
+    print("OPTION VALUATION RESULTS")
+    print("=" * 60)
+    
+    def calculate_and_display(model_name, model_description, pure_or_hw):
+        print(f"\n{model_name.upper()}:")
+        print(f"{model_description}")
+        print("-" * 40)
+        
         scenario_results = []
         for scenario_name, d in scenarios.items():
             val = scenario_value(d, pure_or_hw)
             scenario_results.append((scenario_name, val, d["prob"]))
-            print(f"{name} {scenario_name} value: {rel_stock(val)}")
+            formatted_val = format_value(val, K, S0)
+            scenario_label = scenario_name.replace('_', ' ').title()
+            print(f"  {scenario_label:12} | {formatted_val}")
+        
         weighted = sum(val * prob for _, val, prob in scenario_results)
-        print(f"{name} weighted value: {rel_stock(weighted)}")
+        formatted_weighted = format_value(weighted, K, S0)
+        print(f"  {'Expected Value':12} | {formatted_weighted}")
+        
         return weighted
-    print_and_weighted_avg("Pure Binomial", "pure")
-    print_and_weighted_avg("Hull-White", "hw")
+    
+    pure_result = calculate_and_display(
+        "Standard Binomial Model",
+        "Basic binomial model without employee-specific adjustments", 
+        "pure"
+    )
+    
+    hw_result = calculate_and_display(
+        "Hull-White Employee Model", 
+        "Binomial model with vesting, exit rates, and early exercise",
+        "hw"
+    )
+    
+    print("\n" + "=" * 60)
+    print("SUMMARY")
+    print("=" * 60)
+    print(f"Standard Model Expected Value:    {format_value(pure_result, K, S0)}")
+    print(f"Employee-Adjusted Expected Value: {format_value(hw_result, K, S0)}")
+    
+    discount = ((pure_result - hw_result) / pure_result) * 100 if pure_result > 0 else 0
+    print(f"Employee adjustment discount:     {discount:.1f}%")
+    print(f"\nThe employee-specific factors (vesting, exit risk, early exercise)")
+    print(f"reduce the option value by ${pure_result - hw_result:.3f} compared to a standard option.")
 
 
 
@@ -371,13 +428,15 @@ def assign_globals_from_params(params):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python binomial_model.py <parameters.yaml>")
+        print("Usage: python option_valuation.py <parameters.yaml>")
         sys.exit(1)
     yaml_path = sys.argv[1]
     params = load_parameters_from_yaml(yaml_path)
     assign_globals_from_params(params)
-    print(f"\nLoaded parameters from '{yaml_path}'. Starting option valuation calculations...\n")
+    print(f"\nLoaded parameters from '{yaml_path}'.")
+    print("Starting employee stock option valuation...\n")
     exit_value()
+    print("\nValuation complete.")
 
 # Parameters from "How to value employee stock options"
 test_sample_options = {
